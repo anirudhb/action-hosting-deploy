@@ -15,15 +15,11 @@
  */
 
 import * as crypto from "crypto";
-import { ChannelSuccessResult } from "./deploy";
 
 // Create a stable signature for a deploy used for earmarking.
-export function createDeploySignature(deployResult: ChannelSuccessResult) {
-  const results = Object.values(deployResult.result);
-  const sites = results.map((result) => result.site).sort();
-
+export function createDeploySignature(urls: string[]) {
   const hash = crypto.createHash("sha1");
-  sites.forEach((site) => {
+  urls.forEach((site) => {
     hash.update(site);
   });
   return hash.digest("hex");

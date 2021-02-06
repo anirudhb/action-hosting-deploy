@@ -14,41 +14,21 @@
  * limitations under the License.
  */
 
-import {
-  endGroup,
-  getInput,
-  setFailed,
-  setOutput,
-  startGroup,
-} from "@actions/core";
+import { getInput, setFailed, setOutput } from "@actions/core";
 import { context, getOctokit } from "@actions/github";
-import { existsSync } from "fs";
 import { createCheck } from "./createCheck";
-import { createGacFile } from "./createGACFile";
-import {
-  deployPreview,
-  deployProductionSite,
-  ErrorResult,
-  interpretChannelDeployResult,
-} from "./deploy";
-import { getChannelId } from "./getChannelId";
-import {
-  getURLsMarkdownFromChannelDeployResult,
-  postChannelSuccessComment,
-} from "./postOrUpdateComment";
+import { postChannelSuccessComment } from "./postOrUpdateComment";
 
-// Inputs defined in action.yml
-const expires = getInput("expires");
-const projectId = getInput("projectId");
-const googleApplicationCredentials = getInput("firebaseServiceAccount", {
-  required: true,
-});
-const configuredChannelId = getInput("channelId");
-const isProductionDeploy = configuredChannelId === "live";
 const token = process.env.GITHUB_TOKEN || getInput("repoToken");
 const octokit = token ? getOctokit(token) : undefined;
-const entryPoint = getInput("entryPoint");
-const target = getInput("target");
+
+const urls = getInput("urls", { required: true })
+  .split(",")
+  .map((x) => x.trim());
+const expiry = getInput("expire_time", { required: true });
+const details_url = getInput("details_url", { required: true });
+const failure = getInput("failure") === "true";
+const error_message = getInput("error_message") ?? "";
 
 async function run() {
   const isPullRequest = !!context.payload.pull_request;
@@ -58,78 +38,19 @@ async function run() {
     finish = await createCheck(octokit, context);
   }
 
-  try {
-    startGroup("Verifying firebase.json exists");
-
-    if (entryPoint !== ".") {
-      console.log(`Changing to directory: ${entryPoint}`);
-      try {
-        process.chdir(entryPoint);
-      } catch (err) {
-        throw Error(`Error changing to directory ${entryPoint}: ${err}`);
-      }
-    }
-
-    if (existsSync("./firebase.json")) {
-      console.log("firebase.json file found. Continuing deploy.");
-    } else {
-      throw Error(
-        "firebase.json file not found. If your firebase.json file is not in the root of your repo, edit the entryPoint option of this GitHub action."
-      );
-    }
-    endGroup();
-
-    startGroup("Setting up CLI credentials");
-    const gacFilename = await createGacFile(googleApplicationCredentials);
-    console.log(
-      "Created a temporary file with Application Default Credentials."
-    );
-    endGroup();
-
-    if (isProductionDeploy) {
-      startGroup("Deploying to production site");
-      const deployment = await deployProductionSite(gacFilename, {
-        projectId,
-        target,
-      });
-      if (deployment.status === "error") {
-        throw Error((deployment as ErrorResult).error);
-      }
-      endGroup();
-
-      const hostname = target ? `${target}.web.app` : `${projectId}.web.app`;
-      const url = `https://${hostname}/`;
-      await finish({
-        details_url: url,
-        conclusion: "success",
-        output: {
-          title: `Production deploy succeeded`,
-          summary: `[${hostname}](${url})`,
-        },
-      });
-      return;
-    }
-
-    const channelId = getChannelId(configuredChannelId, context);
-
-    startGroup(`Deploying to Firebase preview channel ${channelId}`);
-    const deployment = await deployPreview(gacFilename, {
-      projectId,
-      expires,
-      channelId,
-      target,
+  if (!failure) {
+    await finish({
+      details_url,
+      conclusion: "success",
+      output: {
+        title: `Deploy succeeded`,
+        summary: `${urls.join(", ")}`,
+      },
     });
 
-    if (deployment.status === "error") {
-      throw Error((deployment as ErrorResult).error);
-    }
-    endGroup();
-
-    const { expireTime, urls } = interpretChannelDeployResult(deployment);
-
     setOutput("urls", urls);
-    setOutput("expire_time", expireTime);
-    setOutput("details_url", urls[0]);
+    setOutput("expire_time", expiry);
+    setOutput("details_url", details_url);
 
     const urlsListMarkdown =
       urls.length === 1
@@ -139,25 +60,16 @@ async function run() {
     if (token && isPullRequest && !!octokit) {
       const commitId = context.payload.pull_request?.head.sha.substring(0, 7);
 
-      await postChannelSuccessComment(octokit, context, deployment, commitId);
+      await postChannelSuccessComment(octokit, context, urls, commitId, expiry);
     }
-
-    await finish({
-      details_url: urls[0],
-      conclusion: "success",
-      output: {
-        title: `Deploy preview succeeded`,
-        summary: getURLsMarkdownFromChannelDeployResult(deployment),
-      },
-    });
-  } catch (e) {
-    setFailed(e.message);
+  } else {
+    setFailed(error_message);
 
     await finish({
       conclusion: "failure",
       output: {
-        title: "Deploy preview failed",
-        summary: `Error: ${e.message}`,
+        title: "Deploy failed",
+        summary: `Error: ${error_message}`,
       },
     });
   }

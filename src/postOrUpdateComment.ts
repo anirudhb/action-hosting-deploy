@@ -17,15 +17,9 @@
 import { endGroup, startGroup } from "@actions/core";
 import type { GitHub } from "@actions/github/lib/utils";
 import { Context } from "@actions/github/lib/context";
-import {
-  ChannelSuccessResult,
-  interpretChannelDeployResult,
-  ErrorResult,
-} from "./deploy";
 import { createDeploySignature } from "./hash";
 
-const BOT_SIGNATURE =
-  "<sub>🔥 via [Firebase Hosting GitHub Action](https://github.com/marketplace/actions/deploy-to-firebase-hosting) 🌎</sub>";
+const BOT_SIGNATURE = "<sub>🔥 via GCP GitHub action 🌎</sub>";
 
 export function createBotCommentIdentifier(signature: string) {
   return function isCommentByBot(comment): boolean {
@@ -33,30 +27,19 @@ export function createBotCommentIdentifier(signature: string) {
   };
 }
 
-export function getURLsMarkdownFromChannelDeployResult(
-  result: ChannelSuccessResult
-): string {
-  const { urls } = interpretChannelDeployResult(result);
-
-  return urls.length === 1
-    ? `[${urls[0]}](${urls[0]})`
-    : urls.map((url) => `- [${url}](${url})`).join("\n");
-}
-
 export function getChannelDeploySuccessComment(
-  result: ChannelSuccessResult,
-  commit: string
+  urls: string[],
+  commit: string,
+  expiry: string
 ) {
-  const deploySignature = createDeploySignature(result);
-  const urlList = getURLsMarkdownFromChannelDeployResult(result);
-  const { expireTime } = interpretChannelDeployResult(result);
+  const deploySignature = createDeploySignature(urls);
 
   return `
 Visit the preview URL for this PR (updated for commit ${commit}):
 
-${urlList}
+${urls.join("\n")}
 
-<sub>(expires ${new Date(expireTime).toUTCString()})</sub>
+<sub>(expires ${expiry})</sub>
 
 ${BOT_SIGNATURE}
 
@@ -66,15 +49,16 @@ ${BOT_SIGNATURE}
 export async function postChannelSuccessComment(
   github: InstanceType<typeof GitHub>,
   context: Context,
-  result: ChannelSuccessResult,
-  commit: string
+  urls: string[],
+  commit: string,
+  expiry: string
 ) {
   const commentInfo = {
     ...context.repo,
     issue_number: context.issue.number,
   };
 
-  const commentMarkdown = getChannelDeploySuccessComment(result, commit);
+  const commentMarkdown = getChannelDeploySuccessComment(urls, commit, expiry);
 
   const comment = {
     ...commentInfo,
@@ -82,7 +66,7 @@ export async function postChannelSuccessComment(
   };
 
   startGroup(`Commenting on PR`);
-  const deploySignature = createDeploySignature(result);
+  const deploySignature = createDeploySignature(urls);
   const isCommentByBot = createBotCommentIdentifier(deploySignature);
 
   let commentId;
