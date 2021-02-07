@@ -35,6 +35,7 @@ export async function createDeployment(
     // },
     created_at: new Date().toISOString(),
     auto_merge: false,
+    required_contexts: [],
   });
 
   return async (details: any) => {
