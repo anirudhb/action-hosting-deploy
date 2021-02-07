@@ -17,6 +17,7 @@
 import { getInput, setFailed, setOutput } from "@actions/core";
 import { context, getOctokit } from "@actions/github";
 import { createCheck } from "./createCheck";
+import { createDeployment } from "./createDeployment";
 import { postChannelSuccessComment } from "./postOrUpdateComment";
 
 const token = process.env.GITHUB_TOKEN || getInput("repoToken");
@@ -29,13 +30,17 @@ const expiry = getInput("expire_time", { required: true });
 const details_url = getInput("details_url", { required: true });
 const failure = getInput("failure") === "true";
 const error_message = getInput("error_message") ?? "";
+const reportAsDeployment = getInput("reportAsDeployment") === "true";
 
 async function run() {
   const isPullRequest = !!context.payload.pull_request;
 
   let finish = (details: Object) => console.log(details);
-  if (token && isPullRequest) {
+  if (token && isPullRequest && !reportAsDeployment) {
     finish = await createCheck(octokit, context);
+  }
+  if (token && reportAsDeployment) {
+    finish = await createDeployment(octokit, context);
   }
 
   if (!failure) {

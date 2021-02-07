@@ -40,6 +40,9 @@ inputs:
   error_message:
     required: false
     description: The error message
+  reportAsDeployment:
+    required: false
+    description: Whether to report this as a check or deployment. Defaults to check.
 outputs:
   urls:
     description: The url(s) deployed to
