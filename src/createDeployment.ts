@@ -29,11 +29,12 @@ export async function createDeployment(
         ? "Production"
         : `Branch ${context.ref.replace(/refs\/head\//g, "")}`,
     environment: context.ref == "refs/head/stable" ? "production" : "staging",
-    transient_environment: context.ref != "refs/head/stable",
-    mediaType: {
-      previews: ["ant-man"],
-    },
+    // transient_environment: context.ref != "refs/head/stable",
+    // mediaType: {
+    //   previews: ["ant-man"],
+    // },
     created_at: new Date().toISOString(),
+    auto_merge: false,
   });
 
   return async (details: any) => {
