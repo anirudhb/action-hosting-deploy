@@ -28,7 +28,7 @@ export async function createDeployment(
       context.ref == "refs/head/stable"
         ? "Production"
         : `Branch ${context.ref.replace(/refs\/head\//g, "")}`,
-    environment: context.ref == "refs/head/stable" ? "production" : "staging",
+    environment: context.ref == "refs/head/stable" ? "Production" : "Staging",
     // transient_environment: context.ref != "refs/head/stable",
     // mediaType: {
     //   previews: ["ant-man"],
@@ -39,13 +39,12 @@ export async function createDeployment(
   });
 
   return async (details: any) => {
+    const isSuccess = details.conclusion && details.conclusion === "success";
     await github.repos.createDeploymentStatus({
       deployment_id: check.data.id,
       ...context.repo,
-      state:
-        details.conclusion && details.conclusion === "success"
-          ? "success"
-          : "failure",
+      environment_url: isSuccess ? details.details_url : "",
+      state: isSuccess ? "success" : "failure",
     });
   };
 }
