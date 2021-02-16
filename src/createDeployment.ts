@@ -21,13 +21,12 @@ export async function createDeployment(
   github: InstanceType<typeof GitHub>,
   context: Context
 ) {
+  const branch = process.env.GITHUB_REF.replace(/^refs\/head\//g, "");
   const check = await github.repos.createDeployment({
     ...context.repo,
     ref: context.ref,
-    description: context.ref.includes("stable")
-      ? "Production"
-      : `Branch ${context.ref.replace(/refs\/head\//g, "")}`,
-    environment: context.ref.includes("stable") ? "Production" : "Staging",
+    description: branch == "stable" ? "Production" : `Branch ${branch}`,
+    environment: branch == "stable" ? "Production" : "Staging",
     // transient_environment: context.ref != "refs/head/stable",
     // mediaType: {
     //   previews: ["ant-man"],
