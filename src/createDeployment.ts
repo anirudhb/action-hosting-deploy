@@ -24,11 +24,10 @@ export async function createDeployment(
   const check = await github.repos.createDeployment({
     ...context.repo,
     ref: context.ref,
-    description:
-      context.ref == "refs/head/stable"
-        ? "Production"
-        : `Branch ${context.ref.replace(/refs\/head\//g, "")}`,
-    environment: context.ref == "refs/head/stable" ? "Production" : "Staging",
+    description: context.ref.includes("stable")
+      ? "Production"
+      : `Branch ${context.ref.replace(/refs\/head\//g, "")}`,
+    environment: context.ref.includes("stable") ? "Production" : "Staging",
     // transient_environment: context.ref != "refs/head/stable",
     // mediaType: {
     //   previews: ["ant-man"],
